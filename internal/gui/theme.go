@@ -17,10 +17,10 @@ import (
 // The launcher sits next to a game that is mostly played at night, in caves.
 // Its palette is that: near-black stone with a faint blue cast, and one warm
 // light source — the torch — reserved for the single thing a player came to
-// do, which is press Play. Selection and links take the launcher's own sky
-// blue, the colour of the slab on the icon. Nothing else is coloured unless
-// the colour says something: which loader an instance runs, whether a thing
-// is on, off, good or broken.
+// do, which is press Play. Selection, links and the title bar take the
+// launcher's own green, the grass on the icon's block. Nothing else is
+// coloured unless the colour says something: which loader an instance runs,
+// whether a thing is on, off, good or broken.
 type Palette struct {
 	Bg      color.NRGBA // the window ground
 	Surface color.NRGBA // rail, bars, cards
@@ -35,7 +35,8 @@ type Palette struct {
 
 	Torch    color.NRGBA // the one action colour
 	TorchInk color.NRGBA // text on torch
-	Sky      color.NRGBA // selection, focus, links
+	Grass    color.NRGBA // the brand: selection, focus, links, title bar
+	GrassInk color.NRGBA // text on grass
 	Good     color.NRGBA
 	Bad      color.NRGBA
 }
@@ -100,9 +101,12 @@ func NewTheme() *Theme {
 		TextMid: rgb(0xA7AEBB),
 		TextDim: rgb(0x6F7785),
 
-		Torch:    rgb(0xF5A524),
+		Torch:    rgb(0xB98A46),
 		TorchInk: rgb(0x1A1206),
-		Sky:      rgb(0x5B8DEF),
+		// The lit top face of the icon's block, to the byte, so the mark in
+		// the top bar and the colour around it are the same green.
+		Grass:    rgb(0x7DC057),
+		GrassInk: rgb(0x0E1A08),
 		Good:     rgb(0x55C57A),
 		Bad:      rgb(0xE5645A),
 	}
@@ -134,21 +138,22 @@ func mix(a, b color.NRGBA, t float32) color.NRGBA {
 	return color.NRGBA{R: lerp(a.R, b.R), G: lerp(a.G, b.G), B: lerp(a.B, b.B), A: lerp(a.A, b.A)}
 }
 
-// loaderColor is the one place a loader's identity becomes a colour. They
-// are the shades the projects use for themselves, nudged towards each other
-// so they sit together on the rail.
+// loaderColor is the one place a loader's identity becomes a colour. Each
+// keeps the hue its project uses for itself; what is shared is the band —
+// every one of them sits at the same saturation and lightness, so no loader
+// shouts louder than another on the rail or in the playtime bars.
 func (t *Theme) loaderColor(l instance.LoaderType) color.NRGBA {
 	switch l {
 	case instance.LoaderNeoForge:
-		return rgb(0xE8792F)
+		return rgb(0xCE8F64)
 	case instance.LoaderForge:
-		return rgb(0x8FA4C4)
+		return rgb(0x648ECE)
 	case instance.LoaderFabric:
-		return rgb(0xDFC07A)
+		return rgb(0xCEAD64)
 	case instance.LoaderQuilt:
-		return rgb(0xA47BE0)
+		return rgb(0x8F64CE)
 	default:
-		return rgb(0x6FBF73)
+		return rgb(0x64CE69)
 	}
 }
 

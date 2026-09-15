@@ -49,7 +49,15 @@ func Screenshot(path string, width, height int, snap launcher.Snapshot, setup fu
 		},
 		Metric: unit.Metric{PxPerDp: 1, PxPerSp: 1},
 	}
-	ui.layoutSnapshot(gtx, snap)
+	// The title bar is ours, so the frame includes it — otherwise the one
+	// part of the window whose colours nobody else can check would be the
+	// one part never rendered here. There is no window behind it offscreen,
+	// and none is needed: with no input source no button is hit, so the bar
+	// never reaches for one.
+	var deco decorations
+	deco.layout(gtx, ui.th, nil, windowTitle, func(gtx layout.Context) layout.Dimensions {
+		return ui.layoutSnapshot(gtx, snap)
+	})
 
 	if err := win.Frame(&ops); err != nil {
 		return fmt.Errorf("rendering: %w", err)

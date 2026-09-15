@@ -2,18 +2,39 @@
 OBJ writer and the Blender script.
 
 Coordinates are Blender's (X right-front, Y depth, Z up), in centimetres.
-The stack is a 5x5x5 cube of one-unit slabs and gaps by default; the bolt
-stands on the front (-Y) face, the l on the right (+X) face, each one slab
-deep. Every part is a prism: a flat polygon extruded along one axis, so its
-faces meet edge to edge and never overlap on screen.
+The mark is a grass block cut into three instance slabs: a 5x5x5 cube of
+one-unit slabs and gaps, the topmost one capped with a thin skin of grass.
+Every part is a prism: a flat polygon extruded along one axis, so its faces
+meet edge to edge and never overlap on screen.
+
+The colours are ours, not Mojang's. Minecraft's own textures are game files
+and may not be redistributed, so the block is drawn in its palette rather
+than lifted from it.
 """
 
+# The tile the mark sits on. The lower slabs are mixed towards it so the
+# stack recedes into its own ground rather than sitting on it as three
+# equally lit plates.
+TILE = "#1E2128"
+DIRT = "#A3714A"
+
+
+def blend(a, b, t):
+    """a mixed t of the way towards b, both "#rrggbb"."""
+    ca = [int(a[i:i + 2], 16) for i in (1, 3, 5)]
+    cb = [int(b[i:i + 2], 16) for i in (1, 3, 5)]
+    return "#%02X%02X%02X" % tuple(int(x + (y - x) * t) for x, y in zip(ca, cb))
+
+
+# Three steps down, the two factors the rail's slab() dims by. The icon does
+# not land on the rail's steps of 2.6x and 2.2x, though: iso_svg.py lights
+# every face and adds ambient on top, which compresses the difference to an
+# even 1.6x a step. Measured on the generated faces, not assumed.
 BASE = {
-    "slab_bottom": "#2E5C39",
-    "slab_middle": "#3E7A4B",
-    "slab_top":    "#5B8DEF",
-    "bolt":        "#F5A524",
-    "letter_l":    "#F2F5FA",
+    "dirt":     DIRT,
+    "dirt_mid": blend(DIRT, TILE, 0.30),
+    "dirt_low": blend(DIRT, TILE, 0.55),
+    "grass":    "#79BD4C",
 }
 
 
@@ -58,27 +79,17 @@ def build(slab=30.0, gap=30.0):
     pitch, side = slab + gap, 2 * (slab + gap) + slab
     parts = []
     square = [(0, 0), (150, 0), (150, 150), (0, 150)]
-    for name, z0 in (("slab_bottom", 0), ("slab_middle", pitch), ("slab_top", 2 * pitch)):
-        parts.append((name, name) + prism(square, 2, z0, z0 + slab))
-
-    # the i: a bolt spanning the full height, its two flat cuts level with
-    # the middle slab's edges. Polygon in (x, z), extruded along -Y.
-    W = side * 3.6 / 7
-    lo, hi = 1 - pitch / side, 1 - (pitch + slab) / side
-    shape = [(0.80, 0.0), (0.0, lo), (0.41, lo), (0.23, 1.0), (1.0, hi), (0.59, hi)]
-    s0 = (150 - W) / 2
-    bolt = [(s0 + x * W, (1 - y) * side) for x, y in shape]
-    main, sides, back = prism(bolt, 1, -slab, 0)
-    parts.append(("bolt", "bolt", back, sides, main))   # the -Y face is the one we see
-
-    # the l: Minecraft's letter, foot and nub one slab tall, in (y, z),
-    # extruded along +X off the right face. It reads along +Y from the
-    # front corner.
-    u = slab
-    s1 = (150 - 3 * u) / 2
-    ell = [(s1, 0), (s1 + 3 * u, 0), (s1 + 3 * u, u), (s1 + 2 * u, u), (s1 + 2 * u, side),
-           (s1, side), (s1, side - u), (s1 + u, side - u), (s1 + u, u), (s1, u)]
-    parts.append(("letter_l", "letter_l") + prism(ell, 0, 150, 150 + u))
+    # The grass grows on the stack, not inside it, so it is its own prism
+    # skimmed off the top slab: a green top face and a green rim around the
+    # sides, the way a grass block reads from the side in game. The stack
+    # keeps its full height, so the silhouette stays a 5x5x5 cube.
+    cap = slab / 4
+    for name, mat, z0 in (("slab_bottom", "dirt_low", 0),
+                          ("slab_middle", "dirt_mid", pitch),
+                          ("slab_top", "dirt", 2 * pitch)):
+        z1 = z0 + slab - (cap if name == "slab_top" else 0)
+        parts.append((name, mat) + prism(square, 2, z0, z1))
+    parts.append(("grass_cap", "grass") + prism(square, 2, side - cap, side))
     return parts
 
 

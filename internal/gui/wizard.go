@@ -180,7 +180,7 @@ func (w *wizard) layoutProgress(gtx layout.Context, u *ui, snap launcher.Snapsho
 func choiceCard(gtx layout.Context, th *Theme, click *widget.Clickable, icon *widget.Icon, title, text string, lead bool) layout.Dimensions {
 	bg, border := th.P.Surface, th.P.LineDim
 	if lead {
-		border = th.P.Sky
+		border = th.P.Grass
 	}
 	if click.Hovered() {
 		bg = th.P.Hover
@@ -198,7 +198,7 @@ func choiceCard(gtx layout.Context, th *Theme, click *widget.Clickable, icon *wi
 									gtx.Constraints.Max = gtx.Constraints.Min
 									c := th.P.TextMid
 									if lead {
-										c = th.P.Sky
+										c = th.P.Grass
 									}
 									return icon.Layout(gtx, c)
 								}),

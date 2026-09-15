@@ -7,9 +7,8 @@ Run inside Blender (Scripting tab, or from a terminal):
 
 It writes instant-launcher.blend next to this script and a test render
 instant-launcher-render.png. The geometry is the icon's, in centimetres:
-a 5x5x5 cube: three 150x150x30 slabs with 30 between them; a lightning-bolt i on the front face whose
-flat cuts sit level with the middle slab; a Minecraft-font l on the right
-face, foot and nub a slab face tall. Both letters protrude one slab depth.
+a 5x5x5 cube: three 150x150x30 slabs with 30 between them, the top one
+wearing a 7.5 skin of grass instead of its own top quarter.
 """
 import math
 import os
@@ -29,8 +28,8 @@ GAP = float(os.environ.get("IL_GAP", 30))
 PITCH = SLAB + GAP
 SIDE = 2 * PITCH + SLAB          # height of the stack
 
-PALETTE = {"Slab bottom": il_model.BASE["slab_bottom"], "Slab middle": il_model.BASE["slab_middle"],
-           "Slab top": il_model.BASE["slab_top"], "Bolt": il_model.BASE["bolt"], "Letter l": il_model.BASE["letter_l"]}
+PALETTE = {"Dirt": il_model.BASE["dirt"], "Dirt mid": il_model.BASE["dirt_mid"],
+           "Dirt low": il_model.BASE["dirt_low"], "Grass": il_model.BASE["grass"]}
 BACKGROUND = "#1E2128"
 
 
@@ -77,8 +76,11 @@ def clear_scene():
         bpy.data.objects.remove(ob, do_unlink=True)
 
 
-NAMES = {"slab_bottom": "Slab bottom", "slab_middle": "Slab middle", "slab_top": "Slab top",
-         "bolt": "Bolt", "letter_l": "Letter l"}
+# Object names per part, material names per material; the mark has more
+# parts than materials, so the two tables are separate.
+OBJECTS = {"slab_bottom": "Slab bottom", "slab_middle": "Slab middle",
+           "slab_top": "Slab top", "grass_cap": "Grass cap"}
+MATERIALS = {"dirt": "Dirt", "dirt_mid": "Dirt mid", "dirt_low": "Dirt low", "grass": "Grass"}
 
 
 def build():
@@ -89,7 +91,7 @@ def build():
         scene.collection.children.link(col)
 
     for name, mat, main, sides, back in il_model.build(SLAB, GAP):
-        mesh_object(NAMES[name], NAMES[mat], [main, back] + sides, col)
+        mesh_object(OBJECTS[name], MATERIALS[mat], [main, back] + sides, col)
 
     # camera: orthographic, the 2:1 pixel-isometric angle (30 degrees elevation)
     cam_data = bpy.data.cameras.new("Icon camera")

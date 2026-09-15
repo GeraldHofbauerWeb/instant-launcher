@@ -80,11 +80,21 @@ func slab(gtx layout.Context, top color.NRGBA, size unit.Dp) layout.Dimensions {
 	gap := s * 0.24 // vertical distance between slabs
 	total := h + d + 2*gap
 
-	left := mix(top, rgb(0x000000), 0.45)
-	right := mix(top, rgb(0x000000), 0.62)
-	dimTop := mix(top, rgb(0x0C0E12), 0.55)
+	// Three steps into the ground, not two. Both lower slabs used to take
+	// the same dimming, which left a jump of 5.6x from the top slab and then
+	// nothing — read as a bright plate over two equally dark ones rather
+	// than as a stack receding. Measured on the visible pixels of each
+	// slab, these two factors fall at about 2.6x and 2.2x a step.
+	dimMid := mix(top, rgb(0x0C0E12), 0.30)
+	dimLow := mix(top, rgb(0x0C0E12), 0.55)
 
-	draw := func(y float32, faceTop, faceL, faceR color.NRGBA) {
+	// One slab, lit from its own colour: the top face as given, the two
+	// sides darkened. Every slab goes through this, so the stack reads as
+	// one object. Giving the lower two a grey edge instead — as this did —
+	// made the top slab look like a different thing on a different stack.
+	draw := func(y float32, faceTop color.NRGBA) {
+		faceL := mix(faceTop, rgb(0x000000), 0.45)
+		faceR := mix(faceTop, rgb(0x000000), 0.62)
 		// Top face.
 		var p clip.Path
 		p.Begin(gtx.Ops)
@@ -117,10 +127,9 @@ func slab(gtx layout.Context, top color.NRGBA, size unit.Dp) layout.Dimensions {
 	}
 
 	// Bottom slab first so the upper ones overlap it.
-	grey := rgb(0x2E3440)
-	draw(2*gap, dimTop, mix(grey, rgb(0x000000), 0.3), mix(grey, rgb(0x000000), 0.5))
-	draw(gap, dimTop, mix(grey, rgb(0x000000), 0.3), mix(grey, rgb(0x000000), 0.5))
-	draw(0, top, left, right)
+	draw(2*gap, dimLow)
+	draw(gap, dimMid)
+	draw(0, top)
 
 	return layout.Dimensions{Size: image.Pt(int(w), int(total))}
 }
@@ -190,8 +199,8 @@ func rigid(w layout.Widget) layout.FlexChild { return layout.Rigid(w) }
 func none(layout.Context) layout.Dimensions { return layout.Dimensions{} }
 
 // mark draws the launcher's icon at a given size: the rounded dark tile
-// with the mark on it, a cube of three stacked instances with the letters
-// i and l standing on its faces. The faces come from mark_faces.go, which
+// with the mark on it, a grass block cut into three stacked instances. The
+// faces come from mark_faces.go, which
 // packaging/mark/iso_svg.py generates from the same model as
 // packaging/instant-launcher.svg, so the window and the application menu
 // agree on what this program looks like.

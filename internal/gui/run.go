@@ -33,6 +33,10 @@ const invalidateInterval = 30 * time.Millisecond
 // the installed .desktop file (see packaging/), or nothing links the two.
 const appID = "instant-launcher"
 
+// windowTitle is what the title bar says, whoever ends up drawing it — the
+// desktop, or us in decorations.go.
+const windowTitle = "Instant Launcher"
+
 // Options configures the launcher window.
 type Options struct {
 	Version    string
@@ -72,9 +76,13 @@ func Run(opts Options) error {
 
 	w := new(app.Window)
 	w.Option(
-		app.Title("Instant Launcher"),
+		app.Title(windowTitle),
 		app.Size(unit.Dp(1180), unit.Dp(760)),
 		app.MinSize(unit.Dp(880), unit.Dp(560)),
+		// The title bar is drawn in decorations.go, in the launcher's own
+		// colours, rather than left to the desktop. Switching the system's
+		// off is also what switches Gio's indigo stand-in off.
+		app.Decorated(false),
 	)
 
 	go pump(ctrl, w)
@@ -83,13 +91,16 @@ func Run(opts Options) error {
 	ui := newUI(ctrl)
 
 	var ops op.Ops
+	var deco decorations
 	for {
 		switch e := w.Event().(type) {
 		case app.DestroyEvent:
 			return e.Err
+		case app.ConfigEvent:
+			deco.configure(e.Config)
 		case app.FrameEvent:
 			gtx := app.NewContext(&ops, e)
-			ui.Layout(gtx)
+			deco.layout(gtx, ui.th, w, windowTitle, ui.Layout)
 			e.Frame(gtx.Ops)
 		}
 	}
@@ -294,26 +305,33 @@ func (u *ui) layoutTopBar(gtx layout.Context, snap launcher.Snapshot) layout.Dim
 	gtx.Constraints.Min.X = gtx.Constraints.Max.X
 
 	return fill(gtx, th.P.Surface, 0, func(gtx layout.Context) layout.Dimensions {
-		return layout.Inset{Top: sp2, Bottom: sp2, Left: sp3, Right: sp3}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+		// Left is sp3 minus the 8 of pill padding that both the Home button
+		// and the back button carry, so their content starts at sp3 — level
+		// with the instance rows in the rail directly below. Right keeps the
+		// full sp3: nothing over there has anything to line up with.
+		return layout.Inset{Top: sp2, Bottom: sp2, Left: sp3 - unit.Dp(8), Right: sp3}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 			gtx.Constraints.Min.X = gtx.Constraints.Max.X
 			return row(gtx, sp2,
 				rigid(func(gtx layout.Context) layout.Dimensions {
 					if snap.Screen != launcher.ScreenInstances {
 						return th.ghost(gtx, &u.home, u.ic.Back, "Instances")
 					}
-					// The mark and the wordmark are the way home: back to the
-					// start screen with nothing selected.
+					// The mark and the word Home are the way back to the start
+					// screen with nothing selected. It says Home rather than
+					// the launcher's name because the title bar above already
+					// carries the name, and a button is better named for what
+					// it does.
 					bg := color.NRGBA{}
 					if u.brand.Hovered() {
 						bg = th.P.Hover
 					}
 					return pressable(gtx, &u.brand, func(gtx layout.Context) layout.Dimensions {
 						return fill(gtx, bg, unit.Dp(6), func(gtx layout.Context) layout.Dimensions {
-							return layout.Inset{Top: unit.Dp(4), Bottom: unit.Dp(4), Left: unit.Dp(6), Right: unit.Dp(10)}.Layout(gtx,
+							return layout.Inset{Top: unit.Dp(4), Bottom: unit.Dp(4), Left: unit.Dp(8), Right: unit.Dp(10)}.Layout(gtx,
 								func(gtx layout.Context) layout.Dimensions {
 									return row(gtx, unit.Dp(10),
-										rigid(func(gtx layout.Context) layout.Dimensions { return slab(gtx, th.P.Sky, unit.Dp(20)) }),
-										rigid(func(gtx layout.Context) layout.Dimensions { return th.brand(gtx, "Instant Launcher", th.P.Text) }),
+										rigid(func(gtx layout.Context) layout.Dimensions { return slab(gtx, th.P.Grass, unit.Dp(20)) }),
+										rigid(func(gtx layout.Context) layout.Dimensions { return th.brand(gtx, "Home", th.P.Text) }),
 									)
 								})
 						})

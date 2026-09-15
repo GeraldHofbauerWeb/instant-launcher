@@ -198,7 +198,7 @@ func (t *Theme) input(gtx layout.Context, ed *widget.Editor, hint string, icon *
 	gtx.Constraints.Min.X = gtx.Constraints.Max.X
 	border := t.P.Line
 	if gtx.Focused(ed) {
-		border = t.P.Sky
+		border = t.P.Grass
 	}
 	return fill(gtx, t.P.Bg, unit.Dp(6), func(gtx layout.Context) layout.Dimensions {
 		return outlined(gtx, border, unit.Dp(6), func(gtx layout.Context) layout.Dimensions {
@@ -266,7 +266,7 @@ func (t *Theme) selectableRow(gtx layout.Context, click *widget.Clickable, selec
 					if !selected {
 						return layout.Dimensions{}
 					}
-					return rect(gtx, t.P.Sky, image.Pt(gtx.Dp(3), gtx.Constraints.Min.Y))
+					return rect(gtx, t.P.Grass, image.Pt(gtx.Dp(3), gtx.Constraints.Min.Y))
 				}),
 			)
 		})
@@ -277,7 +277,7 @@ func (t *Theme) selectableRow(gtx layout.Context, click *widget.Clickable, selec
 func (t *Theme) pill(gtx layout.Context, click *widget.Clickable, selected bool, label string) layout.Dimensions {
 	bg, fg, border := color.NRGBA{}, t.P.TextMid, t.P.Line
 	if selected {
-		bg, fg, border = alpha(t.P.Sky, 0x2A), t.P.Text, t.P.Sky
+		bg, fg, border = alpha(t.P.Grass, 0x2A), t.P.Text, t.P.Grass
 	} else if click.Hovered() {
 		bg, fg = t.P.Hover, t.P.Text
 	}

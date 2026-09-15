@@ -252,7 +252,7 @@ func (s *loginScreen) layoutExisting(gtx layout.Context, u *ui, snap launcher.Sn
 				layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
 					border := th.P.LineDim
 					if active {
-						border = th.P.Sky
+						border = th.P.Grass
 					}
 					return pressable(gtx, &s.useAccount[i], func(gtx layout.Context) layout.Dimensions {
 						gtx.Constraints.Min.X = gtx.Constraints.Max.X

@@ -616,7 +616,7 @@ func (w *workbench) layoutTabs(gtx layout.Context, u *ui, snap launcher.Snapshot
 				underline := gtx.Dp(unit.Dp(2))
 				if selected {
 					defer op.Offset(image.Pt(0, dims.Size.Y)).Push(gtx.Ops).Pop()
-					rect(gtx, th.P.Sky, image.Pt(dims.Size.X, underline))
+					rect(gtx, th.P.Grass, image.Pt(dims.Size.X, underline))
 				}
 				return layout.Dimensions{Size: image.Pt(dims.Size.X, dims.Size.Y+underline)}
 			})

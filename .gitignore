@@ -34,3 +34,7 @@ vendor/
 
 # Icon drafts; the finished ones live in packaging/mark.
 packaging/drafts/
+
+# Python bytecode from the mark generators
+__pycache__/
+*.pyc

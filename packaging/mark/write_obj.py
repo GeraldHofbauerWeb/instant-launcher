@@ -26,7 +26,7 @@ for name, mat, main, sides, back in build(slab, gap):
     for face in [main, back] + sides:
         lines.append("f " + " ".join(str(vid(p)) for p in face))
 with open(out + ".obj", "w") as o:
-    o.write("# Instant Launcher mark: a cube of three instance slabs, a lightning-bolt i and a Minecraft-font l.\n")
+    o.write("# Instant Launcher mark: a grass block cut into three instance slabs.\n")
     o.write(f"# Units: metres, Z up (import with Y forward / Z up). Slab {slab:g} cm, gap {gap:g} cm.\n")
     o.write(f"mtllib {out}.mtl\n")
     for x, y, z in verts:

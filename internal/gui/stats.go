@@ -22,6 +22,9 @@ import (
 // a short one.
 const statsWidth = unit.Dp(560)
 
+// barDim is how far a playtime bar is mixed towards the window ground.
+const barDim = 0.15
+
 // statsRows is how many instances the panel names. The rest are added up
 // into one last line, so the totals still agree with the headline.
 const statsRows = 5
@@ -70,18 +73,11 @@ func (p *statsPanel) Layout(gtx layout.Context, u *ui, snap launcher.Snapshot, c
 		}),
 		spacer(sp2),
 		rigid(func(gtx layout.Context) layout.Dimensions {
-			return row(gtx, sp2,
-				rigid(func(gtx layout.Context) layout.Dimensions {
-					l := material.Label(th.Theme, sizeDisplay, formatPlaytime(stats.Total))
-					l.Font.Typeface = faceDisplay
-					l.Font.Weight = font.Bold
-					l.Color = th.P.Text
-					return l.Layout(gtx)
-				}),
-				rigid(func(gtx layout.Context) layout.Dimensions {
-					return th.smallIn(gtx, statsSubtitle(stats), th.P.TextDim)
-				}),
-			)
+			l := material.Label(th.Theme, sizeDisplay, formatPlaytime(stats.Total))
+			l.Font.Typeface = faceDisplay
+			l.Font.Weight = font.Bold
+			l.Color = th.P.Text
+			return l.Layout(gtx)
 		}),
 	}
 
@@ -119,26 +115,6 @@ func (p *statsPanel) Layout(gtx layout.Context, u *ui, snap launcher.Snapshot, c
 	})
 }
 
-// statsSubtitle says what the headline figure is made of.
-func statsSubtitle(stats instance.PlayStats) string {
-	line := "across " + count(len(stats.Instances), "instance")
-	if stats.Sessions > 0 {
-		line += " · " + count(stats.Sessions, "session")
-	}
-	if stats.Longest > 0 {
-		line += " · longest " + formatPlaytime(stats.Longest)
-	}
-	return line
-}
-
-// count says how many, with the word in the right number.
-func count(n int, word string) string {
-	if n == 1 {
-		return fmt.Sprintf("1 %s", word)
-	}
-	return fmt.Sprintf("%d %ss", n, word)
-}
-
 // layoutDays is the daily chart: one column per day, today on the right.
 func (p *statsPanel) layoutDays(gtx layout.Context, u *ui, stats instance.PlayStats) layout.Dimensions {
 	th := u.th
@@ -154,7 +130,7 @@ func (p *statsPanel) layoutDays(gtx layout.Context, u *ui, stats instance.PlaySt
 		if busiest.Total > 0 {
 			share = float64(day.Total) / float64(busiest.Total)
 		}
-		c := th.P.Sky
+		c := th.P.Grass
 		if day.Day.Equal(busiest.Day) {
 			c = th.P.Torch
 		}
@@ -197,8 +173,14 @@ func (p *statsPanel) layoutDays(gtx layout.Context, u *ui, stats instance.PlaySt
 
 // layoutRow is one instance's share, as a bar in its loader's colour.
 func (p *statsPanel) layoutRow(gtx layout.Context, u *ui, click *widget.Clickable, play instance.InstancePlay) layout.Dimensions {
+	// The bars carry the loader's colour, but a step back into the ground:
+	// they are background data, and at full strength they read louder than
+	// the Play button, which is the one thing on screen asking to be
+	// pressed. Dimmed, Play sits 1.2x above them again — the same footing
+	// it had before the loaders were brightened, and the rail's own marks
+	// keep the full colour.
 	th := u.th
-	c := th.loaderColor(play.Loader.Type)
+	c := mix(th.loaderColor(play.Loader.Type), th.P.Bg, barDim)
 	fg := th.P.TextMid
 	if click.Hovered() {
 		fg = th.P.Text

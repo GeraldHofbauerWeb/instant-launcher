@@ -151,6 +151,20 @@ jobs:
           libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev \
           libxxf86vm-dev libvulkan-dev wayland-protocols xorg-dev
 
+    # Windows takes a program's icon from a resource inside the .exe, not
+    # from a file beside it, so the icon has to be compiled in. goversioninfo
+    # turns packaging/instant-launcher.ico plus the version strings into a
+    # .syso, which the Go linker picks up on its own from the main package.
+    # -64 is not optional: without it the object is 32-bit COFF and the
+    # linker stops at "unknown relocation type 7".
+    - name: Compile the Windows icon into a resource
+      if: matrix.goos == 'windows'
+      run: |
+        go run github.com/josephspurrier/goversioninfo/cmd/goversioninfo@v1.4.1 -64 \
+          -icon packaging/instant-launcher.ico \
+          -o cmd/instant-launcher/resource_windows_amd64.syso \
+          packaging/windows/versioninfo.json
+
     - name: Build binary
       env:
         GOOS: ${{ matrix.goos }}

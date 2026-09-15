@@ -38,3 +38,7 @@ packaging/drafts/
 # Python bytecode from the mark generators
 __pycache__/
 *.pyc
+
+# Windows resource objects, generated from packaging/instant-launcher.ico
+# at build time; never committed.
+*.syso

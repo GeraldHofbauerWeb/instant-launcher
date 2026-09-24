@@ -4,7 +4,7 @@
 # and macOS, and keeping it out of the CLI is what lets the CLI cross-compile
 # for every target from one host with CGO_ENABLED=0.
 
-VERSION      ?= v2.0.0-dev
+VERSION      ?= v2.2.0-dev
 MSA_CLIENT_ID ?=
 
 CLI_BIN  := instant-mc

@@ -12,8 +12,8 @@ import (
 )
 
 // Version is stamped at build time with
-// -ldflags "-X main.Version=v2.0.0".
-var Version = "v2.0.0-dev"
+// -ldflags "-X main.Version=v2.2.0".
+var Version = "v2.2.0-dev"
 
 // defaultMSAClientID is the Azure application id used for Microsoft sign-in,
 // injected at build time. Without one the launcher offers local accounts only.

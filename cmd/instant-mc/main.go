@@ -14,7 +14,7 @@ import (
 
 // Version information
 const (
-	Version = "v2.0.0-dev"
+	Version = "v2.2.0-dev"
 	AppName = "Instant Launcher"
 )
 

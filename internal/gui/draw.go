@@ -65,6 +65,12 @@ func dot(gtx layout.Context, c color.NRGBA, d unit.Dp) layout.Dimensions {
 	return layout.Dimensions{Size: image.Pt(px, px)}
 }
 
+// railSlabSize is the width of the mark in the instance rail and of the one
+// on the Home button above it. They are one constant because they are read
+// together: two sizes that merely happened to be close is how the Home mark
+// came to sit two pixels short of every instance below it.
+const railSlabSize = unit.Dp(22)
+
 // slab draws the launcher's mark at a given size: three stacked isometric
 // slabs, the top face in the given colour. On the rail it stands for an
 // instance, coloured by its loader, so a row of them reads like a shelf of
@@ -216,12 +222,39 @@ func mark(gtx layout.Context, size unit.Dp) layout.Dimensions {
 	border := clip.RRect{Rect: tile, SE: radius, SW: radius, NE: radius, NW: radius}.Path(gtx.Ops)
 	paint.FillShape(gtx.Ops, rgb(0x343945), clip.Stroke{Path: border, Width: max(1, at(3))}.Op())
 
-	// The mark, face by face, back to front.
+	markFacesInto(gtx, f32.Point{}, s/512)
+
+	return layout.Dimensions{Size: image.Pt(int(s), int(s))}
+}
+
+// markGlyph draws the mark alone — the grass block, no tile behind it — in a
+// box that hugs it. It is the mark for places that already have a ground of
+// their own, where the tile would be a dark patch pasted on the bar rather
+// than an icon. mark keeps the tile because it stands for the application
+// itself, and the tile is what the desktop shows.
+//
+// Like slab, and unlike mark, the size given is the width. The Home button's
+// mark sits one row above a rail of slabs, the eye reads the lot as a set,
+// and it caught the two pixels this was short before anyone reading the code
+// did. Width is the measure that makes them agree: the block is a hair
+// taller than a stack of slabs — 1.112 against 1.100 — so asking for equal
+// heights would put the widths out instead, and the widths are what sit
+// against the text.
+func markGlyph(gtx layout.Context, width unit.Dp) layout.Dimensions {
+	w := float32(gtx.Dp(width))
+	scale := w / markSpan.X
+	markFacesInto(gtx, markOrigin, scale)
+	return layout.Dimensions{Size: image.Pt(int(w), int(markSpan.Y*scale))}
+}
+
+// markFacesInto paints the model's faces, back to front, with the tile's
+// origin moved to at and everything scaled by scale.
+func markFacesInto(gtx layout.Context, at f32.Point, scale float32) {
 	for _, face := range markFaces {
 		var p clip.Path
 		p.Begin(gtx.Ops)
 		for i, pt := range face.pts {
-			q := f32.Pt(at(pt.X), at(pt.Y))
+			q := f32.Pt((pt.X-at.X)*scale, (pt.Y-at.Y)*scale)
 			if i == 0 {
 				p.MoveTo(q)
 			} else {
@@ -231,6 +264,19 @@ func mark(gtx layout.Context, size unit.Dp) layout.Dimensions {
 		p.Close()
 		paint.FillShape(gtx.Ops, rgb(face.color), clip.Outline{Path: p.End()}.Op())
 	}
-
-	return layout.Dimensions{Size: image.Pt(int(s), int(s))}
 }
+
+// markOrigin and markSpan are the corner and the size of the box the model
+// actually fills inside the 512-unit tile. The tile has generous padding —
+// right for an application icon, wrong beside a word, where it would read as
+// a gap — so markGlyph measures itself on these rather than on the tile.
+var markOrigin, markSpan = func() (f32.Point, f32.Point) {
+	lo, hi := f32.Pt(512, 512), f32.Point{}
+	for _, face := range markFaces {
+		for _, pt := range face.pts {
+			lo.X, lo.Y = min(lo.X, pt.X), min(lo.Y, pt.Y)
+			hi.X, hi.Y = max(hi.X, pt.X), max(hi.Y, pt.Y)
+		}
+	}
+	return lo, hi.Sub(lo)
+}()

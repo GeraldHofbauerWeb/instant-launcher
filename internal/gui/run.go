@@ -321,6 +321,16 @@ func (u *ui) layoutTopBar(gtx layout.Context, snap launcher.Snapshot) layout.Dim
 					// the launcher's name because the title bar above already
 					// carries the name, and a button is better named for what
 					// it does.
+					//
+					// The mark here is the launcher's own, the block the
+					// desktop entry and the start screen's hero show, not the
+					// bare green stack this drew before. That stack is the
+					// rail's glyph for an instance, coloured by its loader, so
+					// a green one at the top of the window read as a seventh
+					// instance that happened to sit above the list instead of
+					// as the application itself. It goes on the bar without
+					// the icon's tile: the bar is already a surface, and a
+					// second one behind the block would be a sticker on it.
 					bg := color.NRGBA{}
 					if u.brand.Hovered() {
 						bg = th.P.Hover
@@ -330,7 +340,7 @@ func (u *ui) layoutTopBar(gtx layout.Context, snap launcher.Snapshot) layout.Dim
 							return layout.Inset{Top: unit.Dp(4), Bottom: unit.Dp(4), Left: unit.Dp(8), Right: unit.Dp(10)}.Layout(gtx,
 								func(gtx layout.Context) layout.Dimensions {
 									return row(gtx, unit.Dp(10),
-										rigid(func(gtx layout.Context) layout.Dimensions { return slab(gtx, th.P.Grass, unit.Dp(20)) }),
+										rigid(func(gtx layout.Context) layout.Dimensions { return markGlyph(gtx, railSlabSize) }),
 										rigid(func(gtx layout.Context) layout.Dimensions { return th.brand(gtx, "Home", th.P.Text) }),
 									)
 								})

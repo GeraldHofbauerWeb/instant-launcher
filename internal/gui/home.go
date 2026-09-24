@@ -140,7 +140,7 @@ func (r *railState) layoutRow(gtx layout.Context, u *ui, snap launcher.Snapshot,
 					if !inst.Configured {
 						c = th.P.TextDim
 					}
-					return slab(gtx, c, unit.Dp(22))
+					return slab(gtx, c, railSlabSize)
 				}),
 				layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
 					return column(gtx, unit.Dp(2),

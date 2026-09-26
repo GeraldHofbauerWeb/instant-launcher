@@ -12,11 +12,19 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Version information
-const (
-	Version = "v2.2.1-dev"
-	AppName = "Instant Launcher"
-)
+// Version is stamped at build time with
+// -ldflags "-X main.Version=v2.2.1".
+//
+// It has to be a var. The linker's -X writes into a string variable and
+// silently does nothing to a constant, which is what this was: every release
+// up to and including v2.2.1 shipped a CLI that called itself v2.x.y-dev,
+// because the flag was there, looked right, and was quietly dropped. The GUI
+// got it right and hid the problem — the same build, the same flag, one
+// binary stamped and the other not.
+var Version = "v2.2.1-dev"
+
+// AppName is the name the CLI gives itself in its own output.
+const AppName = "Instant Launcher"
 
 // guiBinaryName is the companion GUI executable. It is a separate binary
 // because Gio requires cgo on Linux and macOS; keeping it out of this one lets

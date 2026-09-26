@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/GeraldHofbauerWeb/instant-launcher/internal/proc"
@@ -26,6 +27,7 @@ type Process struct {
 
 	waitErr error
 	done    chan struct{}
+	stopped atomic.Bool
 }
 
 // Spec is everything needed to start the game.
@@ -153,11 +155,23 @@ func (p *Process) Running() bool {
 	}
 }
 
+// Stopped reports whether the game exited because Stop asked it to, rather
+// than of its own accord. The caller needs this because the exit itself does
+// not say: the JVM installs its own SIGTERM handler, runs the shutdown hooks,
+// saves the world and then exits 143 deliberately, which reaches os/exec as
+// an ordinary non-zero exit code and is indistinguishable from a crash. On
+// Windows, where Stop can only kill, the code differs and the problem is the
+// same. Only the side that sent the signal knows, so it records it.
+func (p *Process) Stopped() bool { return p.stopped.Load() }
+
 // Stop asks the game to close, escalating to a kill if it ignores the request.
 func (p *Process) Stop(grace time.Duration) error {
 	if p.Cmd.Process == nil || !p.Running() {
+		// Already gone, and not at our hand: whatever it exited with is its
+		// own and must keep being reported as such.
 		return nil
 	}
+	p.stopped.Store(true)
 
 	if err := signalTerminate(p.Cmd.Process); err != nil {
 		return p.Cmd.Process.Kill()

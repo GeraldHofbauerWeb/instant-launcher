@@ -1475,6 +1475,16 @@ func (c *Controller) watchGame(name string, proc *launch.Process) {
 	err := proc.Wait()
 	tail := proc.Log.Tail(200)
 
+	// A stop we asked for is not a failure. The game still exits non-zero —
+	// 143 on Unix, where the JVM takes SIGTERM, runs its shutdown hooks and
+	// leaves by that code on purpose — so without this, pressing Stop ended
+	// every session with "the game ended with an error: exit status 143"
+	// printed in red over a world that had just been saved properly.
+	stopped := proc.Stopped()
+	if stopped {
+		err = nil
+	}
+
 	c.mu.Lock()
 	if c.game == proc {
 		c.game = nil
@@ -1487,6 +1497,12 @@ func (c *Controller) watchGame(name string, proc *launch.Process) {
 			g.ExitErr = err
 			g.Tail = tail
 		})
+		if stopped {
+			// Otherwise the button reports nothing at all: the notice is
+			// gone by design and the status line still says the game was
+			// handed to Java.
+			s.SetStatus(name + " stopped")
+		}
 	}})
 
 	c.recordPlaytime(name, proc.Started, time.Now())

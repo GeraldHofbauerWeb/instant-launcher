@@ -12,14 +12,32 @@ permissions:
   packages: write
   actions: read
 
+# Two notes on the versions below, because both were chosen rather than
+# inherited.
+#
+# The actions are on their Node 24 majors. GitHub is retiring the Node 20
+# runtime, and until this bump every run carried a deprecation warning saying
+# the old actions were being forced onto Node 24 anyway — running on an engine
+# they were never tested against is worse than naming it. The majors need a
+# runner of at least v2.327.1, which every GitHub-hosted runner is well past.
+#
+# The runners are pinned to a numbered Ubuntu, not ubuntu-latest, which
+# migrates to Ubuntu 26 from 19 October 2026. A release pipeline is the wrong
+# place to find out what a distribution upgrade changed, and there is a
+# specific reason to expect it to: libgles2-mesa-dev and libegl1-mesa-dev,
+# which the Gio build needs below, are already transitional packages on 24.04
+# and may simply be gone on 26. Moving up is then its own change, made
+# deliberately and watched, rather than something that happens to the next tag
+# pushed after a Sunday in October.
+
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
 
     - name: Set up Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v7
       with:
         # Follow go.mod rather than pinning a version here; the repo already
         # uses language features newer than the version this used to name.
@@ -58,7 +76,7 @@ jobs:
   # single Linux host with cgo disabled.
   build-cli:
     needs: test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       CGO_ENABLED: 0
     strategy:
@@ -70,10 +88,10 @@ jobs:
             arch: arm64
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
 
     - name: Set up Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v7
       with:
         go-version-file: go.mod
 
@@ -102,7 +120,7 @@ jobs:
         ls -la
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: instant-mc-cli-${{ matrix.os }}-${{ matrix.arch }}
         path: |
@@ -128,10 +146,10 @@ jobs:
     runs-on: ${{ matrix.runner }}
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
 
     - name: Set up Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v7
       with:
         go-version-file: go.mod
 
@@ -195,7 +213,7 @@ jobs:
         ls -la
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: instant-launcher-${{ matrix.goos }}-${{ matrix.goarch }}
         path: |
@@ -206,17 +224,17 @@ jobs:
 
   release:
     needs: [build-cli, build-gui]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: startsWith(github.ref, 'refs/tags/')
     permissions:
       contents: write
       actions: read
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
 
     - name: Download all artifacts
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         path: artifacts
 
@@ -233,7 +251,7 @@ jobs:
         ls -la release-assets/
 
     - name: Create Release
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v3
       with:
         files: release-assets/*
         generate_release_notes: true
@@ -245,7 +263,7 @@ jobs:
   notify:
     needs: [test, build-cli, build-gui, release]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
     - name: Notify pipepush
       run: |

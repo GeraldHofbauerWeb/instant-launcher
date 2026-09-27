@@ -279,6 +279,39 @@ func TestRenderScreens(t *testing.T) {
 		u.dialogs.openCreate(demoSnapshot(), "")
 		u.dialogs.pickLoaderVersion(u, instance.LoaderNeoForge, "1.21.1", "21.1.248", func(string) {})
 	}
+	// The cleanup dialog needs a measured plan in the snapshot: offscreen
+	// there is no controller to answer the action it dispatches.
+	cleanupPlan := launcher.CleanupState{
+		Instance: "sebsmodpack5",
+		Measured: true,
+		Plan: instance.CleanupPlan{
+			Files: 99, Bytes: 12_400_000, Kept: 4,
+			Groups: []instance.CleanupGroup{
+				{Instance: "sebsmodpack5", Kind: instance.ContentLogs, Files: 96, Bytes: 12_000_000},
+				{Instance: "sebsmodpack5", Kind: instance.ContentCrashReports, Files: 3, Bytes: 400_000},
+			},
+		},
+	}
+	cleanupInstance := demoSnapshot()
+	cleanupInstance.Cleanup = cleanupPlan
+	cleanupDialog := func(u *ui) { u.dialogs.openCleanup("sebsmodpack5") }
+
+	cleanupGlobal := demoSnapshot()
+	cleanupGlobal.Cleanup = launcher.CleanupState{
+		Measured: true,
+		Plan: instance.CleanupPlan{
+			Files: 431, Bytes: 58_300_000,
+			Groups: []instance.CleanupGroup{
+				{Files: 214, Bytes: 31_000_000},
+				{Instance: "sebsmodpack5", Kind: instance.ContentLogs, Files: 96, Bytes: 12_000_000},
+				{Instance: "sebsmodpack4", Kind: instance.ContentLogs, Files: 71, Bytes: 9_800_000},
+				{Instance: "sebi-1.20.1", Kind: instance.ContentLogs, Files: 47, Bytes: 5_100_000},
+				{Instance: "sebsmodpack5", Kind: instance.ContentCrashReports, Files: 3, Bytes: 400_000},
+			},
+		},
+	}
+	cleanupGlobalDialog := func(u *ui) { u.dialogs.openCleanup("") }
+
 	contextMenu := func(u *ui) {
 		snap := demoSnapshot()
 		u.pointer = image.Pt(150, 205)
@@ -334,6 +367,8 @@ func TestRenderScreens(t *testing.T) {
 		{"wizard-import", empty, wizardImport},
 		{"wizard-no-minecraft", noMinecraft, nil},
 		{"importing", importing, nil},
+		{"dialog-cleanup", cleanupInstance, cleanupDialog},
+		{"dialog-cleanup-global", cleanupGlobal, cleanupGlobalDialog},
 		{"dialog-create", demoSnapshot(), createDialog},
 		{"dialog-import", demoSnapshot(), importDialog},
 		{"picker-loader", withVersions, pickerLoader},

@@ -156,6 +156,30 @@ type Snapshot struct {
 	// Stats is the playtime across every instance, refreshed on every
 	// refresh and as soon as a game exits.
 	Stats instance.PlayStats
+
+	// Cleanup is what the cleanup dialog is showing.
+	Cleanup CleanupState
+}
+
+// CleanupState is a measured cleanup waiting to be confirmed. The dialog
+// shows a count and a size before anything is deleted, so the plan has to
+// live somewhere both the counting and the drawing can reach.
+type CleanupState struct {
+	// Instance is the instance being cleaned, or empty for every instance
+	// plus the launcher's own logs.
+	Instance  string
+	OlderThan time.Duration
+	Plan      instance.CleanupPlan
+	// Measuring is true while the files are being counted; Measured says
+	// the plan belongs to this instance and this age, rather than being
+	// whatever the dialog was last opened on.
+	Measuring bool
+	Measured  bool
+}
+
+// For reports whether the plan on hand describes this instance at this age.
+func (c CleanupState) For(name string, olderThan time.Duration) bool {
+	return c.Measured && c.Instance == name && c.OlderThan == olderThan
 }
 
 // Store holds the application state. It is written by the pump goroutine and
@@ -199,6 +223,7 @@ type Store struct {
 	reclaimable map[string]int64
 	storeSize   int64
 	stats       instance.PlayStats
+	cleanup     CleanupState
 }
 
 // NewStore returns an empty store.
@@ -246,6 +271,7 @@ func (s *Store) Snapshot() Snapshot {
 		Reclaimable:      make(map[string]int64, len(s.reclaimable)),
 		StoreSize:        s.storeSize,
 		Stats:            s.stats,
+		Cleanup:          s.cleanup,
 	}
 	snap.Stats.Instances = append([]instance.InstancePlay(nil), s.stats.Instances...)
 	snap.Stats.Days = append([]instance.DayPlay(nil), s.stats.Days...)
@@ -485,6 +511,14 @@ func (s *Store) SetStoreSize(size int64) {
 }
 
 // SetStats publishes the playtime totals.
+// SetCleanup publishes what a cleanup would remove, for the dialog that is
+// about to ask whether to go ahead.
+func (s *Store) SetCleanup(c CleanupState) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.cleanup = c
+}
+
 func (s *Store) SetStats(stats instance.PlayStats) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

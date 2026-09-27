@@ -1,13 +1,16 @@
 package gui
 
 import (
+	"fmt"
 	"strings"
+	"time"
 
 	"gioui.org/layout"
 	"gioui.org/unit"
 	"gioui.org/widget"
 
 	"github.com/GeraldHofbauerWeb/instant-launcher/internal/instance"
+	"github.com/GeraldHofbauerWeb/instant-launcher/internal/launch"
 	"github.com/GeraldHofbauerWeb/instant-launcher/internal/launcher"
 )
 
@@ -17,11 +20,12 @@ type dialogs struct {
 
 	create createDialog
 	del    deleteDialog
+	clean  cleanupDialog
 	pick   picker
 }
 
 func newDialogs() dialogs {
-	return dialogs{create: newCreateDialog(), pick: newPicker()}
+	return dialogs{create: newCreateDialog(), pick: newPicker(), clean: newCleanupDialog()}
 }
 
 func (d *dialogs) Layout(gtx layout.Context, u *ui, snap launcher.Snapshot) layout.Dimensions {
@@ -49,6 +53,13 @@ func (d *dialogs) Layout(gtx layout.Context, u *ui, snap launcher.Snapshot) layo
 		return u.th.modal(gtx, &d.scrim, unit.Dp(460), func(gtx layout.Context) layout.Dimensions {
 			return d.del.Layout(gtx, u)
 		})
+	case d.clean.open:
+		if d.scrim.Clicked(gtx) {
+			d.clean.open = false
+		}
+		return u.th.modal(gtx, &d.scrim, unit.Dp(600), func(gtx layout.Context) layout.Dimensions {
+			return d.clean.Layout(gtx, u, snap)
+		})
 	}
 	return layout.Dimensions{}
 }
@@ -61,6 +72,10 @@ func (d *dialogs) openDelete(inst instance.Instance) {
 	d.del.inst = inst
 	d.del.open = true
 }
+
+// openCleanup asks about one instance, or about all of them when name is
+// empty.
+func (d *dialogs) openCleanup(name string) { d.clean.show(name) }
 
 // pickMinecraft opens the release list.
 func (d *dialogs) pickMinecraft(u *ui, current string, onPick func(string)) {
@@ -401,4 +416,189 @@ func (d *deleteDialog) Layout(gtx layout.Context, u *ui) layout.Dimensions {
 			)
 		}),
 	)
+}
+
+// --- clean up ---
+
+// cleanupDialog asks before it deletes, and asks with a number. It measures
+// what a cleanup would take, shows it heap by heap, and only then offers the
+// button.
+//
+// Nothing it can remove is irreplaceable — logs and crash reports are
+// written again the next time the game runs — so the confirming button is an
+// ordinary one rather than the red of the delete dialog. What makes the
+// question worth asking at all is the size: clearing a year of logs is worth
+// seeing coming, and so is a cleanup that would free nothing.
+type cleanupDialog struct {
+	open bool
+	// name is the instance, or empty for every instance and the launcher's
+	// own logs.
+	name string
+	// age indexes instance.CleanupAges.
+	age  int
+	ages []widget.Clickable
+
+	confirm, cancel widget.Clickable
+
+	// asked is the (instance, age) a plan has been requested for, so the
+	// dialog asks once per change and not once per frame.
+	asked    string
+	askedAge time.Duration
+	hasAsked bool
+}
+
+func newCleanupDialog() cleanupDialog {
+	return cleanupDialog{ages: make([]widget.Clickable, len(instance.CleanupAges()))}
+}
+
+// olderThan is the cutoff the pills currently select.
+func (d *cleanupDialog) olderThan() time.Duration {
+	ages := instance.CleanupAges()
+	if d.age < 0 || d.age >= len(ages) {
+		return 0
+	}
+	return ages[d.age]
+}
+
+func (d *cleanupDialog) show(name string) {
+	d.open = true
+	d.name = name
+	d.age = 0
+	d.hasAsked = false
+}
+
+// title names what is about to be cleaned.
+func (d *cleanupDialog) title() string {
+	if d.name == "" {
+		return "Clean up every instance?"
+	}
+	return "Clean up " + d.name + "?"
+}
+
+func (d *cleanupDialog) Layout(gtx layout.Context, u *ui, snap launcher.Snapshot) layout.Dimensions {
+	th := u.th
+	age := d.olderThan()
+
+	// Ask for a count when the dialog opens and whenever the age changes,
+	// exactly once each: a dispatch per frame would queue hundreds of walks
+	// over the same directories before the first one answered.
+	if !d.hasAsked || d.asked != d.name || d.askedAge != age {
+		d.asked, d.askedAge, d.hasAsked = d.name, age, true
+		u.dispatch(launcher.ActionPlanCleanup{Name: d.name, OlderThan: age})
+	}
+
+	for i := range d.ages {
+		if d.ages[i].Clicked(gtx) {
+			d.age = i
+		}
+	}
+	if d.cancel.Clicked(gtx) {
+		d.open = false
+	}
+
+	plan := snap.Cleanup
+	ready := plan.For(d.name, age)
+	if d.confirm.Clicked(gtx) && ready && !plan.Plan.Empty() {
+		d.open = false
+		u.dispatch(launcher.ActionCleanup{Name: d.name, OlderThan: age})
+	}
+
+	children := []layout.FlexChild{
+		rigid(func(gtx layout.Context) layout.Dimensions { return th.display(gtx, d.title()) }),
+		rigid(func(gtx layout.Context) layout.Dimensions {
+			what := "Logs and crash reports."
+			if d.name == "" {
+				what = "Logs and crash reports in every instance, and the launcher's own start-up logs."
+			}
+			return th.wrapped(gtx, what+" The game writes them again as it runs. "+
+				"Worlds, screenshots, mods and configuration are never touched.", th.P.TextMid)
+		}),
+		rigid(func(gtx layout.Context) layout.Dimensions {
+			kids := make([]layout.FlexChild, 0, len(d.ages))
+			for i, a := range instance.CleanupAges() {
+				i := i
+				kids = append(kids, rigid(func(gtx layout.Context) layout.Dimensions {
+					return th.pill(gtx, &d.ages[i], i == d.age, instance.CleanupAgeLabel(a))
+				}))
+			}
+			return row(gtx, sp2, kids...)
+		}),
+		rigid(func(gtx layout.Context) layout.Dimensions {
+			return d.layoutPlan(gtx, u, snap, ready)
+		}),
+	}
+
+	children = append(children, rigid(func(gtx layout.Context) layout.Dimensions {
+		return row(gtx, sp2,
+			rigid(func(gtx layout.Context) layout.Dimensions {
+				label := "Clean up"
+				if ready && !plan.Plan.Empty() {
+					label = "Clean up " + launch.FormatBytes(plan.Plan.Bytes)
+				}
+				if !ready || plan.Plan.Empty() {
+					// Measured and empty, or still counting: there is
+					// nothing to confirm yet.
+					return th.secondary(gtx, &d.confirm, label)
+				}
+				return th.primary(gtx, &d.confirm, u.ic.Delete, label)
+			}),
+			rigid(func(gtx layout.Context) layout.Dimensions {
+				return th.ghost(gtx, &d.cancel, nil, "Cancel")
+			}),
+		)
+	}))
+
+	return column(gtx, sp3, children...)
+}
+
+// layoutPlan shows what was counted: the total, then the heaps behind it.
+func (d *cleanupDialog) layoutPlan(gtx layout.Context, u *ui, snap launcher.Snapshot, ready bool) layout.Dimensions {
+	th := u.th
+	if !ready {
+		return th.smallIn(gtx, "Counting…", th.P.TextDim)
+	}
+
+	plan := snap.Cleanup.Plan
+	if plan.Empty() {
+		msg := "Nothing to clean up."
+		if plan.Kept > 0 {
+			// Not the same thing as an empty instance, and saying so saves
+			// the player wondering whether the button works.
+			msg = fmt.Sprintf("Nothing that old. %d files are newer than the cutoff.", plan.Kept)
+		}
+		return th.smallIn(gtx, msg, th.P.TextDim)
+	}
+
+	kids := []layout.FlexChild{
+		rigid(func(gtx layout.Context) layout.Dimensions {
+			line := fmt.Sprintf("%d files · %s", plan.Files, launch.FormatBytes(plan.Bytes))
+			if plan.Kept > 0 {
+				line += fmt.Sprintf(" · %d newer files stay", plan.Kept)
+			}
+			return th.bodyMedium(gtx, line)
+		}),
+	}
+	// The heaps, biggest first, and only the first few: a global cleanup
+	// over a dozen instances would otherwise be a wall of two-line entries.
+	const shown = 6
+	for i, g := range plan.Groups {
+		if i >= shown {
+			kids = append(kids, rigid(func(gtx layout.Context) layout.Dimensions {
+				return th.smallIn(gtx, fmt.Sprintf("and %d more", len(plan.Groups)-shown), th.P.TextDim)
+			}))
+			break
+		}
+		g := g
+		kids = append(kids, rigid(func(gtx layout.Context) layout.Dimensions {
+			return row(gtx, sp2,
+				layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
+					return th.smallIn(gtx, g.Label(), th.P.TextMid)
+				}),
+				rigid(func(gtx layout.Context) layout.Dimensions {
+					return th.monoIn(gtx, fmt.Sprintf("%d · %s", g.Files, launch.FormatBytes(g.Bytes)), th.P.TextDim)
+				}),
+			)
+		}))
+	}
+	return column(gtx, unit.Dp(4), kids...)
 }

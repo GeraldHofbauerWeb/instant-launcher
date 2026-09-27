@@ -116,6 +116,18 @@ type (
 		IncludeSaves       bool
 		IncludeScreenshots bool
 	}
+	// ActionPlanCleanup counts the throwaway files a cleanup would remove,
+	// so the dialog can name a number before anything happens. An empty
+	// Name means every instance and the launcher's own logs.
+	ActionPlanCleanup struct {
+		Name      string
+		OlderThan time.Duration
+	}
+	// ActionCleanup removes them.
+	ActionCleanup struct {
+		Name      string
+		OlderThan time.Duration
+	}
 )
 
 func (ActionRefresh) isAction()        {}
@@ -142,6 +154,8 @@ func (ActionReclaim) isAction()        {}
 func (ActionListVersions) isAction()   {}
 func (ActionInstallLoader) isAction()  {}
 func (ActionSetConfig) isAction()      {}
+func (ActionPlanCleanup) isAction()    {}
+func (ActionCleanup) isAction()        {}
 
 func (ActionSaveOptions) isAction()           {}
 func (ActionRestoreOptions) isAction()        {}
@@ -323,6 +337,10 @@ func (c *Controller) run(ctx context.Context, id TaskID, a Action) {
 	switch action := a.(type) {
 	case ActionRefresh:
 		c.doRefresh(ctx)
+	case ActionPlanCleanup:
+		c.doPlanCleanup(action)
+	case ActionCleanup:
+		c.doCleanup(action)
 	case ActionSelect:
 		c.doSelect(action.Name)
 	case ActionLoginOffline:
@@ -1270,6 +1288,57 @@ func (c *Controller) doStopGame() {
 	}
 	// Give the game a chance to save before it is killed.
 	_ = proc.Stop(10 * time.Second)
+}
+
+// doPlanCleanup counts what a cleanup would take, without taking it. The
+// dialog asks before it deletes, and an honest question needs a number.
+func (c *Controller) doPlanCleanup(a ActionPlanCleanup) {
+	c.emit(Event{Terminal: true, Apply: func(s *Store) {
+		s.SetCleanup(CleanupState{Instance: a.Name, OlderThan: a.OlderThan, Measuring: true})
+	}})
+
+	plan, err := c.Manager.PlanCleanup(a.Name, a.OlderThan)
+	if err != nil {
+		c.emit(Event{Terminal: true, Apply: func(s *Store) { s.SetCleanup(CleanupState{}) }})
+		c.fail(err)
+		return
+	}
+	c.emit(Event{Terminal: true, Apply: func(s *Store) {
+		s.SetCleanup(CleanupState{Instance: a.Name, OlderThan: a.OlderThan, Plan: plan, Measured: true})
+	}})
+}
+
+// doCleanup removes the throwaway files and says what went.
+//
+// Afterwards the window is re-read, because a cleanup changes exactly the
+// counts the overview shows and the sizes beside them. What it cannot take,
+// it reports rather than fails on: on Windows the log of a running game is
+// held open, and one stubborn file is no reason to call the whole thing an
+// error.
+func (c *Controller) doCleanup(a ActionCleanup) {
+	done, err := c.Manager.RunCleanup(a.Name, a.OlderThan)
+	c.emit(Event{Terminal: true, Apply: func(s *Store) { s.SetCleanup(CleanupState{}) }})
+	if err != nil {
+		c.fail(err)
+		return
+	}
+
+	where := "every instance"
+	if a.Name != "" {
+		where = a.Name
+	}
+	msg := fmt.Sprintf("Nothing to clean up in %s", where)
+	if done.Files > 0 {
+		msg = fmt.Sprintf("Cleaned up %s · %d files, %s freed",
+			where, done.Files, launch.FormatBytes(done.Bytes))
+	}
+	if done.Failed > 0 {
+		msg += fmt.Sprintf(" · %d in use and left alone", done.Failed)
+	}
+	c.setStatus(msg)
+
+	c.refreshInstances()
+	c.reloadSelected(c.store.Snapshot().Selected)
 }
 
 func (c *Controller) doScanStorage(ctx context.Context) {

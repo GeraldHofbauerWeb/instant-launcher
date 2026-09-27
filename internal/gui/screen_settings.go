@@ -25,6 +25,7 @@ type settingsScreen struct {
 	saves  map[string]*widget.Clickable
 
 	harvest, scan, reclaim, reclaimYes, reclaimNo widget.Clickable
+	cleanup                                       widget.Clickable
 	confirmingReclaim                             bool
 }
 
@@ -67,6 +68,11 @@ func (s *settingsScreen) Layout(gtx layout.Context, u *ui, snap launcher.Snapsho
 	}
 	if s.scan.Clicked(gtx) {
 		ctrl.Dispatch(launcher.ActionScanStorage{})
+	}
+	if s.cleanup.Clicked(gtx) {
+		// No instance name: every instance, and the launcher's own logs
+		// with them, which nothing else in the window ever clears.
+		u.dialogs.openCleanup("")
 	}
 	if s.reclaim.Clicked(gtx) {
 		s.confirmingReclaim = true
@@ -202,6 +208,13 @@ func (s *settingsScreen) layoutStorage(gtx layout.Context, u *ui, snap launcher.
 					return layout.Dimensions{}
 				}
 				return th.ghost(gtx, &s.reclaim, u.ic.Delete, "Free "+launch.FormatBytes(total))
+			}),
+			flexFill(),
+			rigid(func(gtx layout.Context) layout.Dimensions {
+				// Its own affair, over on the right: consolidating and
+				// freeing are about the copies of the game, this is about
+				// what the game scribbles as it runs.
+				return th.secondary(gtx, &s.cleanup, "Clean up logs…")
 			}),
 		)
 	}))

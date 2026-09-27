@@ -231,6 +231,7 @@ func (u *ui) instanceMenu(snap launcher.Snapshot, inst instance.Instance) []menu
 		{label: "Overview", icon: u.ic.Info, divider: true, do: openTab(0)},
 		{label: "Settings", icon: u.ic.Settings, do: openTab(settingsTab)},
 		{label: "Instance folder", icon: u.ic.Folder, do: func() { u.dispatch(launcher.ActionOpen{Path: inst.Path}) }},
+		{label: "Clean up…", icon: u.ic.Clear, do: func() { u.dialogs.openCleanup(name) }},
 		{label: "Duplicate…", icon: u.ic.Add, divider: true, do: func() {
 			// The dialog takes the version from the selected instance's
 			// metadata, so ask for the state as it is now.
@@ -286,7 +287,7 @@ type workbench struct {
 	tabs   []widget.Clickable
 	tabRow widget.List
 
-	play, stop, cancel, folder widget.Clickable
+	play, stop, cancel, folder, clean widget.Clickable
 	// playLast and stopLast are the start screen's buttons for the instance
 	// picked last, before anything is selected.
 	playLast, stopLast widget.Clickable
@@ -346,6 +347,9 @@ func (w *workbench) Layout(gtx layout.Context, u *ui, snap launcher.Snapshot) la
 	}
 	if w.folder.Clicked(gtx) {
 		u.ctrl.Dispatch(launcher.ActionOpen{Path: inst.Path})
+	}
+	if w.clean.Clicked(gtx) {
+		u.dialogs.openCleanup(inst.Name)
 	}
 
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
@@ -514,6 +518,11 @@ func (w *workbench) layoutHeader(gtx layout.Context, u *ui, snap launcher.Snapsh
 			}),
 			rigid(func(gtx layout.Context) layout.Dimensions {
 				return th.ghost(gtx, &w.folder, u.ic.Folder, "Instance folder")
+			}),
+			rigid(func(gtx layout.Context) layout.Dimensions {
+				// Beside the folder, because both are about the instance as
+				// it sits on disk rather than about playing it.
+				return th.ghost(gtx, &w.clean, u.ic.Clear, "Clean up")
 			}),
 			rigid(func(gtx layout.Context) layout.Dimensions {
 				switch {

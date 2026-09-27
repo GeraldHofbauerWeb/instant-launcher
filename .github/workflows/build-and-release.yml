@@ -204,12 +204,24 @@ jobs:
 
         cd dist
         ARCHIVE="instant-launcher-${{ matrix.goos }}-${{ matrix.goarch }}"
-        if [ "${{ matrix.goos }}" = "windows" ]; then
+        case "${{ matrix.goos }}" in
+        windows)
           zip "${ARCHIVE}.zip" "${BINARY_NAME}"
-        else
+          ;;
+        darwin)
+          # macOS takes a program's name and icon from Info.plist inside a
+          # bundle and from nowhere else, so what ships for macOS is an
+          # .app. A bare binary got the generic executable icon.
+          ../packaging/macos/bundle.sh "${BINARY_NAME}" \
+            ../packaging/instant-launcher.icns "${GITHUB_REF_NAME}" .
+          tar -czf "${ARCHIVE}.tar.gz" "Instant Launcher.app"
+          rm -rf "Instant Launcher.app"
+          ;;
+        *)
           tar -czf "${ARCHIVE}.tar.gz" "${BINARY_NAME}"
-        fi
-        rm "${BINARY_NAME}"
+          ;;
+        esac
+        rm -f "${BINARY_NAME}"
         ls -la
 
     - name: Upload artifacts

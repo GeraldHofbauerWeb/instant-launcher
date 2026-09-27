@@ -31,9 +31,14 @@ SIZES = (16, 24, 32, 48, 64, 128, 256)
 SS = 4
 
 
-def raster(polys, size):
-    """Paint polygons back to front into `size` x `size` RGBA bytes."""
-    n = size * SS
+def raster(polys, size, ss=SS):
+    """Paint polygons back to front into `size` x `size` RGBA bytes.
+
+    `ss` is the supersampling factor. It is a parameter because the icns
+    writer needs a 1024 px image, where a 4x buffer is sixteen million cells
+    of pure Python and the edges are already smooth at 2x.
+    """
+    n = size * ss
     grid = [[None] * n for _ in range(n)]
 
     for rgb, pts in polys:
@@ -57,13 +62,13 @@ def raster(polys, size):
                     row[xx] = rgb
 
     out = bytearray(size * size * 4)
-    full = SS * SS
+    full = ss * ss
     for y in range(size):
-        rows = grid[y * SS:(y + 1) * SS]
+        rows = grid[y * ss:(y + 1) * ss]
         for x in range(size):
             r = g = b = hits = 0
             for row in rows:
-                for c in row[x * SS:(x + 1) * SS]:
+                for c in row[x * ss:(x + 1) * ss]:
                     if c is not None:
                         r += c[0]
                         g += c[1]

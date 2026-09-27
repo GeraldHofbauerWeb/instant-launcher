@@ -499,12 +499,17 @@ func (c *Controller) doRefresh(ctx context.Context) {
 	c.refreshStats()
 
 	// Refresh means everything on screen, not only the lists behind it. The
-	// selected instance's own panel — its mods, worlds, logs and settings —
-	// was the one thing the button left untouched, because content is
-	// listed when an instance is picked and was never listed again.
-	if selected := c.store.Snapshot().Selected; selected != "" {
-		c.doLoadContent(selected)
-	}
+	// selected instance's own panel — its mods, worlds, logs, metadata —
+	// was the one thing the button left untouched, because all of that is
+	// read when an instance is picked and was never read again. Quitting a
+	// game refreshed more of it than the button meant for refreshing did,
+	// which is the wrong way round: whatever any other path brings up to
+	// date, this one has to as well.
+	//
+	// It costs nothing that a typist would notice: the settings panel fills
+	// its editors only when the selection changes, so what someone has typed
+	// and not yet saved survives this.
+	c.reloadSelected(c.store.Snapshot().Selected)
 
 	// The session is renewed off to one side: the window is already usable,
 	// and waiting for Microsoft here would undo that.
@@ -527,12 +532,35 @@ func (c *Controller) detector(instances []instance.Instance) *java.Detector {
 }
 
 func (c *Controller) doSelect(name string) {
-	meta, err := c.Manager.GetMeta(name)
-	ok := err == nil
-	installed := c.profileInstalled(meta)
+	meta, ok, installed := c.instanceState(name)
 	c.remember(name)
+	// One event, deliberately: the settings panel re-seeds its editors when
+	// the selection changes, so a frame that saw the new name beside the old
+	// metadata would fill the form from the instance just left behind.
 	c.emit(Event{Terminal: true, Apply: func(s *Store) {
 		s.SetSelected(name)
+		s.SetEditing(meta, ok)
+		s.SetProfileInstalled(installed)
+	}})
+	c.doLoadContent(name)
+}
+
+// instanceState reads what the workbench shows about one instance: its
+// metadata and whether its version is in the store.
+func (c *Controller) instanceState(name string) (meta instance.Meta, ok bool, installed bool) {
+	meta, err := c.Manager.GetMeta(name)
+	ok = err == nil
+	return meta, ok, c.profileInstalled(meta)
+}
+
+// reloadSelected re-reads everything that belongs to the instance on the
+// workbench, without touching the selection itself.
+func (c *Controller) reloadSelected(name string) {
+	if name == "" {
+		return
+	}
+	meta, ok, installed := c.instanceState(name)
+	c.emit(Event{Terminal: true, Apply: func(s *Store) {
 		s.SetEditing(meta, ok)
 		s.SetProfileInstalled(installed)
 	}})

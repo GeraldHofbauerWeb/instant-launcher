@@ -140,3 +140,36 @@ func TestRefreshRelistsTheSelectedInstance(t *testing.T) {
 		return len(s.ContentOf(instance.ContentMods)) == 1
 	})
 }
+
+// TestRefreshRereadsTheInstancesMetadata closes the gap Gerry asked about:
+// quitting a game re-read the selected instance's metadata, and the button
+// whose whole job is refreshing did not. Whatever any other path brings up
+// to date, Refresh has to as well.
+func TestRefreshRereadsTheInstancesMetadata(t *testing.T) {
+	ctrl := newTestController(t, nil)
+	isolateInstances(t, ctrl)
+	playableInstance(t, ctrl, "pack")
+
+	ctrl.Dispatch(ActionRefresh{})
+	ctrl.Dispatch(ActionSelect{Name: "pack"})
+	waitFor(t, ctrl, "the instance selected", func(s Snapshot) bool {
+		return s.Selected == "pack" && s.ContentFor == "pack"
+	})
+
+	// Something outside this window edits the instance: a second launcher
+	// window, the CLI, a text editor on meta.json.
+	meta, err := ctrl.Manager.GetMeta("pack")
+	if err != nil {
+		t.Fatal(err)
+	}
+	meta.Notes = "edited elsewhere"
+	meta.MinecraftVersion = "1.21.8"
+	if err := ctrl.Manager.SetMeta("pack", meta); err != nil {
+		t.Fatal(err)
+	}
+
+	ctrl.Dispatch(ActionRefresh{})
+	waitFor(t, ctrl, "the metadata to be re-read", func(s Snapshot) bool {
+		return s.Editing.Notes == "edited elsewhere" && s.Editing.MinecraftVersion == "1.21.8"
+	})
+}

@@ -498,6 +498,14 @@ func (c *Controller) doRefresh(ctx context.Context) {
 
 	c.refreshStats()
 
+	// Refresh means everything on screen, not only the lists behind it. The
+	// selected instance's own panel — its mods, worlds, logs and settings —
+	// was the one thing the button left untouched, because content is
+	// listed when an instance is picked and was never listed again.
+	if selected := c.store.Snapshot().Selected; selected != "" {
+		c.doLoadContent(selected)
+	}
+
 	// The session is renewed off to one side: the window is already usable,
 	// and waiting for Microsoft here would undo that.
 	go c.maybeRenewSession(ctx)
@@ -1506,6 +1514,28 @@ func (c *Controller) watchGame(name string, proc *launch.Process) {
 	}})
 
 	c.recordPlaytime(name, proc.Started, time.Now())
+	c.reloadAfterPlay(name)
+}
+
+// reloadAfterPlay lists the instance again now that its session is over.
+//
+// A game leaves a great deal behind: a log every single time, the worlds it
+// has just written, screenshots, a crash report if it came to that, the
+// configs a mod creates on its first run, and an options.txt the game
+// rewrites as it closes. None of it was ever re-read, so the overview went
+// on showing the counts from the moment the instance was selected — "7
+// worlds, 96 logs, newest 1 min ago" over a session that had just added one
+// of each, and settings changed in the game were gone again the moment
+// anything reloaded the panel.
+//
+// Only while the instance is still the one on the workbench. The listing in
+// the store belongs to whichever instance is selected, so refreshing another
+// one here would empty the panel the player is currently looking at.
+func (c *Controller) reloadAfterPlay(name string) {
+	if c.store.Snapshot().Selected != name {
+		return
+	}
+	c.doLoadContent(name)
 }
 
 // recordPlaytime books the session that just ended and puts the new numbers
@@ -1516,6 +1546,15 @@ func (c *Controller) watchGame(name string, proc *launch.Process) {
 // Play statistics are best-effort; a failure here must not surface as an
 // error over a game that ran perfectly well.
 func (c *Controller) recordPlaytime(name string, start, end time.Time) {
+	// The rail and the totals are re-read whatever happened to the booking.
+	// They describe the session that just ran either way, and a meta file
+	// that could not be written is no reason to leave the counts beside
+	// every instance showing the state from before it was played.
+	defer func() {
+		c.refreshInstances()
+		c.refreshStats()
+	}()
+
 	meta, err := c.Manager.RecordPlaySession(name, start, end)
 	if err != nil {
 		return
@@ -1526,8 +1565,6 @@ func (c *Controller) recordPlaytime(name string, start, end time.Time) {
 			s.SetEditing(meta, true)
 		}
 	}})
-	c.refreshInstances()
-	c.refreshStats()
 }
 
 // refreshStats republishes the playtime totals across all instances.

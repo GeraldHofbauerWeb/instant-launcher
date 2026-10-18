@@ -142,7 +142,10 @@ jobs:
           # start.
           - { runner: ubuntu-22.04, goos: linux, goarch: amd64, cgo: 1 }
           - { runner: ubuntu-22.04, goos: windows, goarch: amd64, cgo: 0 }
-          - { runner: macos-14, goos: darwin, goarch: arm64, cgo: 1 }
+          # macos-14 is retired on 2 November 2026. Pinned to 15 rather than
+          # latest for the same reason as the Ubuntu pin; the deployment
+          # target in the build step keeps the binary running on macOS 11.
+          - { runner: macos-15, goos: darwin, goarch: arm64, cgo: 1 }
     runs-on: ${{ matrix.runner }}
 
     steps:
@@ -188,6 +191,10 @@ jobs:
         GOOS: ${{ matrix.goos }}
         GOARCH: ${{ matrix.goarch }}
         CGO_ENABLED: ${{ matrix.cgo }}
+        # Without it clang targets the runner's own macOS for the cgo part,
+        # and the app would need macOS 15 while Info.plist promises 11.0.
+        # Only clang on macOS reads it; the other builds ignore it.
+        MACOSX_DEPLOYMENT_TARGET: "11.0"
       run: |
         BINARY_NAME="instant-launcher"
         # A GUI-subsystem binary, so Windows does not open a console window
